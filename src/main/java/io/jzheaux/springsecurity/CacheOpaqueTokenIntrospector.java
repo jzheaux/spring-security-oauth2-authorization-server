@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +20,14 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionException;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.stereotype.Component;
+
+import static org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames.AUDIENCE;
+import static org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames.CLIENT_ID;
+import static org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames.EXPIRES_AT;
+import static org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames.ISSUED_AT;
+import static org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames.ISSUER;
+import static org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames.NOT_BEFORE;
+import static org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames.SCOPE;
 
 @Component
 public class CacheOpaqueTokenIntrospector implements OpaqueTokenIntrospector {
@@ -39,57 +46,40 @@ public class CacheOpaqueTokenIntrospector implements OpaqueTokenIntrospector {
 	}
 
 	private OAuth2AuthenticatedPrincipal convertClaimsSet(TokenIntrospectionSuccessResponse response) {
-		Collection<GrantedAuthority> authorities = new ArrayList();
+		Collection<GrantedAuthority> authorities = new ArrayList<>();
 		Map<String, Object> claims = response.toJSONObject();
-		Iterator var5;
 		if (response.getAudience() != null) {
-			List<String> audiences = new ArrayList();
-			var5 = response.getAudience().iterator();
-
-			while(var5.hasNext()) {
-				Audience audience = (Audience)var5.next();
+			List<String> audiences = new ArrayList<>();
+			for (Audience audience : response.getAudience()) {
 				audiences.add(audience.getValue());
 			}
-
-			claims.put("aud", Collections.unmodifiableList(audiences));
+			claims.put(AUDIENCE, Collections.unmodifiableList(audiences));
 		}
-
 		if (response.getClientID() != null) {
-			claims.put("client_id", response.getClientID().getValue());
+			claims.put(CLIENT_ID, response.getClientID().getValue());
 		}
-
-		Instant iat;
 		if (response.getExpirationTime() != null) {
-			iat = response.getExpirationTime().toInstant();
-			claims.put("exp", iat);
+			Instant exp = response.getExpirationTime().toInstant();
+			claims.put(EXPIRES_AT, exp);
 		}
-
 		if (response.getIssueTime() != null) {
-			iat = response.getIssueTime().toInstant();
-			claims.put("iat", iat);
+			Instant iat = response.getIssueTime().toInstant();
+			claims.put(ISSUED_AT, iat);
 		}
-
 		if (response.getIssuer() != null) {
-			claims.put("iss", this.issuer(response.getIssuer().getValue()));
+			claims.put(ISSUER, issuer(response.getIssuer().getValue()));
 		}
-
 		if (response.getNotBeforeTime() != null) {
-			claims.put("nbf", response.getNotBeforeTime().toInstant());
+			claims.put(NOT_BEFORE, response.getNotBeforeTime().toInstant());
 		}
-
 		if (response.getScope() != null) {
 			List<String> scopes = Collections.unmodifiableList(response.getScope().toStringList());
-			claims.put("scope", scopes);
-			var5 = scopes.iterator();
+			claims.put(SCOPE, scopes);
 
-			while(var5.hasNext()) {
-				String scope = (String)var5.next();
-				StringBuilder var10003 = new StringBuilder();
-				this.getClass();
-				authorities.add(new SimpleGrantedAuthority(var10003.append("SCOPE_").append(scope).toString()));
+			for (String scope : scopes) {
+				authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope));
 			}
 		}
-
 
 		return new DefaultOAuth2AuthenticatedPrincipal(claims, authorities);
 	}
